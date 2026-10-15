@@ -73,7 +73,11 @@ pip install -r requirements.txt
 
 ### 4. Configure your API key
 
-Create a `.env` file in the project root:
+Copy the example env file and add your key:
+
+```bash
+cp .env.example .env
+```
 
 ```env
 GROQ_API_KEY=your_groq_api_key_here
@@ -83,24 +87,35 @@ Get a free key at [console.groq.com/keys](https://console.groq.com/keys).
 
 ### 5. Run
 
+**Development** (Flask dev server):
+
 ```bash
-python main.py
+python app.py
 ```
 
-Open **http://127.0.0.1:5000** in your browser.
+**Production** (Waitress WSGI server — multi-threaded, SSE-safe):
+
+```bash
+python wsgi.py
+```
+
+Open **http://127.0.0.1:5000** in your browser. The port respects the `PORT` env var.
 
 ---
 
 ## Project Structure
 
 ```
-professor-ai/
-├── main.py               # Flask app, Groq streaming, system prompt
-├── templates/
-│   └── index.html        # Chat UI, Mermaid rendering, streaming logic
+llm_chatbot/
+├── app.py            # Flask app: routes, Groq streaming, system prompt
+├── wsgi.py           # Production entrypoint (Waitress)
 ├── requirements.txt
-├── .env                  # API key (never commit)
-└── README.md
+├── .env              # Secrets (never commit)
+├── .env.example      # Env template
+├── .gitignore
+├── README.md
+└── templates/
+    └── index.html    # Chat UI, Mermaid rendering, streaming logic
 ```
 
 ---
@@ -110,6 +125,14 @@ professor-ai/
 ### `GET /`
 
 Serves the chat interface.
+
+### `GET /health`
+
+Lightweight health check for load balancers / uptime monitors.
+
+```json
+{ "status": "ok", "model": "openai/gpt-oss-20b" }
+```
 
 ### `POST /chat`
 
@@ -161,11 +184,11 @@ data: {"error": "Rate limit reached. Try again shortly."}
 
 | What                    | Where                          | How                                          |
 |-------------------------|--------------------------------|----------------------------------------------|
-| Model                   | `main.py` → `MODEL`            | Any Groq-hosted chat model                   |
-| Answer format           | `main.py` → `SYSTEM_PROMPT`    | Add/remove sections or change the flowchart  |
+| Model                   | `.env` → `GROQ_MODEL`          | Any Groq-hosted chat model                   |
+| Host / Port             | `.env` → `HOST`, `PORT`        | Defaults: 127.0.0.1:5000 (prod binds 0.0.0.0)|
+| Answer format           | `app.py` → `SYSTEM_PROMPT`     | Add/remove sections or change the flowchart  |
 | Diagram theme/colors    | `index.html` → `themeVariables`| Mermaid base theme variables                 |
-| Conversation depth      | `main.py` → `history[-10:]`    | Raise or lower the context window            |
-| Port                    | `main.py` → `app.run(...)`     | Change `port=5000`                           |
+| Conversation depth      | `app.py` → `history[-10:]`     | Raise or lower the context window            |
 
 ---
 

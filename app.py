@@ -1,13 +1,17 @@
 import json
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
-from flask import Flask, Response, render_template, request
+from flask import Flask, Response, jsonify, render_template, request
 from groq import Groq, APIConnectionError, APIStatusError, RateLimitError
 
-load_dotenv()
+BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(BASE_DIR / ".env")
 
-MODEL = "openai/gpt-oss-20b"
+MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-20b")
+HOST = os.environ.get("HOST", "127.0.0.1")
+PORT = int(os.environ.get("PORT", "5000"))
 
 SYSTEM_PROMPT = """You are "Professor AI", an expert teaching assistant. Your ONLY job is to help students and beginners understand topics deeply and simply.
 
@@ -53,7 +57,11 @@ Rules:
 - If the user asks to compare things, the flowchart should be a comparison/decision flow.
 """
 
-app = Flask(__name__)
+app = Flask(
+    __name__,
+    template_folder=str(BASE_DIR / "templates"),
+    static_folder=str(BASE_DIR / "static"),
+)
 
 
 def get_client() -> Groq:
@@ -64,6 +72,11 @@ def get_client() -> Groq:
             "(get one at https://console.groq.com/keys)"
         )
     return Groq(api_key=api_key)
+
+
+@app.route("/health")
+def health():
+    return jsonify({"status": "ok", "model": MODEL})
 
 
 @app.route("/")
@@ -129,4 +142,4 @@ def chat():
 
 
 if __name__ == "__main__":
-    app.run(debug=False, port=5000)
+    app.run(host=HOST, port=PORT, debug=False, threaded=True)
