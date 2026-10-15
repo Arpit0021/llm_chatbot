@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Professor AI</title>
+<style>
+  :root {
+    --bg: #212121;
+    --surface: #303030;
+    --surface-2: #3a3a3a;
+    --border: #444;
+    --text: #ececec;
+    --muted: #9b9b9b;
+    --accent: #10a37f;
+    --user-bubble: #323232;
+    --radius: 24px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  header {
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    flex-shrink: 0;
+    position: relative;
+  }
+  header h1 { font-size: 16px; font-weight: 600; }
+  header .model-tag {
+    position: absolute; right: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    color: var(--muted);
+    font-family: ui-monospace, monospace;
+  }
+
+  main { flex: 1; overflow-y: auto; }
+  .chat-container { max-width: 768px; margin: 0 auto; padding: 24px 20px 160px; }
+
+  .welcome { text-align: center; padding: 12vh 20px 40px; }
+  .welcome h2 { font-size: 28px; font-weight: 600; margin-bottom: 10px; }
+  .welcome p { color: var(--muted); font-size: 15px; line-height: 1.6; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 24px; }
+  .chip {
+    background: var(--surface); border: 1px solid var(--border); color: var(--text);
+    padding: 8px 14px; border-radius: 12px; font-size: 13px; cursor: pointer;
+  }
+  .chip:hover { background: var(--surface-2); }
+
+  .msg { margin: 20px 0; animation: fadeIn 0.2s ease; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  .msg.user { display: flex; justify-content: flex-end; }
+  .msg.user .bubble {
+    background: var(--user-bubble); padding: 10px 18px; border-radius: var(--radius);
+    max-width: 75%; font-size: 15px; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word;
+  }
+  .msg.assistant { padding: 4px 0; }
+  .msg.assistant .bubble {
+    font-size: 15px; line-height: 1.75; word-wrap: break-word; overflow-wrap: break-word;
+  }
+  .bubble.error { background: #3a1a1a; border: 1px solid #991b1b; color: #fca5a5; padding: 12px 16px; border-radius: 12px; }
+
+  .bubble pre {
+    background: #0d0d0d; border: 1px solid var(--border); border-radius: 8px;
+    padding: 14px; overflow-x: auto; margin: 12px 0;
+    font-size: 13.5px; font-family: ui-monospace, "Cascadia Code", monospace; line-height: 1.5;
+  }
+  .bubble code {
+    font-family: ui-monospace, "Cascadia Code", monospace; background: #0d0d0d;
+    padding: 2px 6px; border-radius: 5px; font-size: 13.5px;
+  }
+  .bubble pre code { background: none; padding: 0; }
+  .bubble ul, .bubble ol { margin: 10px 0; padding-left: 24px; }
+  .bubble li { margin: 6px 0; }
+  .bubble h1 { font-size: 1.4em; margin: 18px 0 8px; }
+  .bubble h2 { font-size: 1.2em; margin: 18px 0 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+  .bubble h3 { font-size: 1.05em; margin: 14px 0 6px; }
+  .bubble p { margin: 10px 0; }
+  .bubble p:first-child { margin-top: 0; }
+  .bubble p:last-child { margin-bottom: 0; }
+  .bubble strong { color: #fff; }
+
+  /* ---------- mermaid diagram ---------- */
+  .mermaid-wrap {
+    display: flex; justify-content: center; margin: 16px 0; padding: 18px 12px;
+    background: #171717; border: 1px solid var(--border); border-radius: 14px;
+    overflow-x: auto;
+  }
+  .mermaid-wrap svg { max-width: 100%; height: auto; }
+  .mmd-skel {
+    background: #171717; border: 1px solid var(--border); border-radius: 14px;
+    padding: 22px 18px; margin: 16px 0;
+  }
+  .mmd-skel-title { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+  .mmd-skel-bar {
+    height: 8px; border-radius: 999px;
+    background: linear-gradient(90deg, #2a2a2a, #3d3d3d, #2a2a2a);
+    background-size: 200% 100%; animation: shimmer 1.2s infinite linear;
+  }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  .mmd-error {
+    background: #2a1a1a; border: 1px solid #7f1d1d; border-radius: 12px;
+    padding: 14px 16px; margin: 14px 0; color: #fca5a5; font-size: 13px;
+  }
+  .mmd-error pre {
+    margin-top: 8px; font-size: 12px; color: var(--muted);
+    white-space: pre-wrap; background: #170f0f; padding: 10px; border-radius: 8px;
+    border: 1px solid #4a1c1c;
+  }
+
+  .copy-row { margin-top: 10px; }
+  .copy-btn {
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    border-radius: 8px; padding: 5px 12px; font-size: 12px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .copy-btn:hover { color: var(--text); background: var(--surface); }
+
+  .typing { display: inline-flex; gap: 6px; padding: 8px 0; align-items: center; }
+  .typing span {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--muted);
+    animation: blink 1.3s infinite;
+  }
+  .typing span:nth-child(2) { animation-delay: 0.2s; }
+  .typing span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink { 0%,80%,100% {opacity:0.25; transform: scale(0.85);} 40% {opacity:1; transform: scale(1);} }
+
+  footer {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: linear-gradient(transparent, var(--bg) 30%);
+    padding: 20px 20px 18px; z-index: 10;
+  }
+  .composer {
+    max-width: 768px; margin: 0 auto; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 28px;
+    display: flex; align-items: flex-end; padding: 8px 8px 8px 20px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.35);
+  }
+  textarea {
+    flex: 1; background: none; border: none; color: var(--text);
+    font-size: 15px; font-family: inherit; resize: none;
+    min-height: 28px; max-height: 180px; outline: none; line-height: 1.5; padding: 8px 0;
+  }
+  textarea::placeholder { color: var(--muted); }
+  button#send {
+    width: 36px; height: 36px; border-radius: 50%; border: none;
+    background: var(--accent); color: #fff; font-size: 16px; cursor: pointer;
+    flex-shrink: 0; display: grid; place-items: center; transition: opacity 0.15s;
+  }
+  button#send:hover:not(:disabled) { opacity: 0.85; }
+  button#send:disabled { opacity: 0.35; cursor: not-allowed; }
+  .hint { max-width: 768px; margin: 8px auto 0; font-size: 11px; color: var(--muted); text-align: center; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Professor AI</h1>
+  <span class="model-tag">{{ model }}</span>
+</header>
+
+<main id="main">
+  <div class="chat-container" id="chat">
+    <div class="welcome" id="welcome">
+      <h2>What do you want to learn today?</h2>
+      <p>Every answer includes a simple explanation, visual flowchart, example &amp; key takeaways.</p>
+      <div class="chips">
+        <span class="chip">How does HTTP work?</span>
+        <span class="chip">Explain recursion</span>
+        <span class="chip">What is a neural network?</span>
+        <span class="chip">How does DNS work?</span>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="composer">
+    <textarea id="input" placeholder="Ask anything to learn…" rows="1"></textarea>
+    <button id="send" title="Send">↑</button>
+  </div>
+  <div class="hint">Layman explanation → Flowchart → Example → Key takeaways</div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>
+const chat = document.getElementById("chat");
+const main = document.getElementById("main");
+const input = document.getElementById("input");
+const sendBtn = document.getElementById("send");
+let welcome = document.getElementById("welcome");
+const history = [];
+let busy = false;
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+/* ================= mermaid ================= */
+
+const hasMermaid = typeof mermaid !== "undefined";
+let mermaidSeq = 0;
+
+if (hasMermaid) {
+  mermaid.initialize({
+    startOnLoad: false,
+    securityLevel: "strict",
+    theme: "base",
+    fontFamily: '"Segoe UI", system-ui, -apple-system, sans-serif',
+    fontSize: "13px",
+    flowchart: { htmlLabels: true, useMaxWidth: true, curve: "basis", nodeSpacing: 50, rankSpacing: 55, padding: 12 },
+    themeVariables: {
+      background: "#171717",
+      primaryColor: "#1a3a5c",
+      primaryTextColor: "#e8f2fc",
+      primaryBorderColor: "#2d6da8",
+      secondaryColor: "#14532d",
+      secondaryTextColor: "#e8f5ec",
+      secondaryBorderColor: "#22c55e",
+      tertiaryColor: "#4a3408",
+      tertiaryTextColor: "#fcf3e0",
+      tertiaryBorderColor: "#d97706",
+      lineColor: "#9b9b9b",
+      textColor: "#ececec",
+      mainBkg: "#1a3a5c",
+      nodeBorder: "#2d6da8",
+      clusterBkg: "#262626",
+      clusterBorder: "#444",
+      titleColor: "#ececec",
+      edgeLabelBackground: "#262626",
+      defaultLinkColor: "#9b9b9b",
+      altBackground: "#262626"
+    }
+  });
+}
+
+function mmdSkeleton() {
+  return `<div class="mmd-skel"><div class="mmd-skel-title">Rendering flowchart…</div><div class="mmd-skel-bar"></div></div>`;
+}
+
+function mmdErrorHtml(code) {
+  return `<div class="mmd-error"><strong>Flowchart could not be rendered</strong><pre>${escapeHtml(code)}</pre></div>`;
+}
+
+function startMermaidRender(msg, idx, code) {
+  if (!hasMermaid) {
+    msg.cache.set(idx, { status: "done", html: `<pre><code>${escapeHtml(code)}</code></pre>` });
+    return;
+  }
+  if (msg.cache.has(idx)) return;
+  msg.cache.set(idx, { status: "rendering", html: mmdSkeleton() });
+  (async () => {
+    try {
+      const id = "mmd-" + (++mermaidSeq);
+      const { svg } = await mermaid.render(id, code);
+      msg.cache.set(idx, { status: "done", html: `<div class="mermaid-wrap">${svg}</div>` });
+    } catch (e) {
+      msg.cache.set(idx, { status: "error", html: mmdErrorHtml(code) });
+    }
+    scheduleUpdate(msg, msg.text);
+  })();
+}
+
+/* ================= streaming text split ================= */
+
+function splitSegments(text) {
+  const segs = [];
+  let i = 0;
+  while (i < text.length) {
+    let fs = text.indexOf("```", i);
+    while (fs !== -1 && fs > 0 && text[fs - 1] !== "\n") fs = text.indexOf("```", fs + 3);
+    if (fs === -1) { segs.push({ type: "text", content: text.slice(i) }); break; }
+    if (fs > i) segs.push({ type: "text", content: text.slice(i, fs) });
+    const nl = text.indexOf("\n", fs);
+    const lang = nl === -1 ? "" : text.slice(fs + 3, nl).trim().toLowerCase();
+    const codeStart = nl === -1 ? text.length : nl + 1;
+    const fe = text.indexOf("\n```", codeStart);
+    if (fe === -1) {
+      segs.push({ type: "code", lang, code: text.slice(codeStart), complete: false });
+      break;
+    }
+    segs.push({ type: "code", lang, code: text.slice(codeStart, fe), complete: true });
+    i = fe + 4;
+    if (text[i] === "\n") i++;
+  }
+  return segs;
+}
+
+/* ================= markdown (text segments only) ================= */
+
+function mdInline(s) {
+  return s
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, "$1<em>$2</em>");
+}
+
+function mdToHtml(src) {
+  const lines = escapeHtml(src).split("\n");
+  const out = [];
+  let para = [];
+  let list = [];
+  const flushPara = () => { if (para.length) { out.push("<p>" + para.join("<br/>") + "</p>"); para = []; } };
+  const flushList = () => { if (list.length) { out.push("<ul>" + list.join("") + "</ul>"); list = []; } };
+  for (const line of lines) {
+    const lm = line.match(/^\s*[-*]\s+(.*)$/);
+    if (lm) { flushPara(); list.push("<li>" + mdInline(lm[1]) + "</li>"); continue; }
+    flushList();
+    if (!line.trim()) { flushPara(); continue; }
+    const hm = line.match(/^(#{1,3})\s+(.*)$/);
+    if (hm) {
+      flushPara();
+      const lvl = hm[1].length;
+      out.push(`<h${lvl}>${mdInline(hm[2])}</h${lvl}>`);
+      continue;
+    }
+    para.push(mdInline(line));
+  }
+  flushList();
+  flushPara();
+  return out.join("");
+}
+
+/* ================= incremental message rendering ================= */
+
+function segmentHtml(msg, idx, seg) {
+  if (seg.type === "text") return mdToHtml(seg.content);
+  if (seg.type === "code") {
+    if (seg.lang === "mermaid") {
+      if (!seg.complete) return `<pre><code>${escapeHtml(seg.code)}</code></pre>`;
+      const cached = msg.cache.get(idx);
+      if (cached) return cached.html;
+      startMermaidRender(msg, idx, seg.code);
+      return mmdSkeleton();
+    }
+    return `<pre><code>${escapeHtml(seg.code)}</code></pre>`;
+  }
+  return "";
+}
+
+function updateMessage(msg, text) {
+  msg.text = text;
+  const segs = splitSegments(text);
+  while (msg.els.length > segs.length) msg.els.pop().remove();
+  for (let i = 0; i < segs.length; i++) {
+    const seg = segs[i];
+    const isLast = i === segs.length - 1;
+    if (!isLast && msg.sealed.has(i)) continue;
+    let el = msg.els[i];
+    if (!el) {
+      el = document.createElement("div");
+      msg.bubble.appendChild(el);
+      msg.els.push(el);
+    }
+    const html = segmentHtml(msg, i, seg);
+    if (el._html !== html) { el.innerHTML = html; el._html = html; }
+    if (!isLast) {
+      const cached = msg.cache.get(i);
+      if (seg.type !== "code" || seg.lang !== "mermaid" || (cached && cached.status === "done")) msg.sealed.add(i);
+    }
+  }
+}
+
+function scheduleUpdate(msg, text) {
+  msg.pending = text;
+  if (msg.raf) return;
+  msg.raf = requestAnimationFrame(() => {
+    msg.raf = null;
+    updateMessage(msg, msg.pending);
+  });
+}
+
+function flushUpdate(msg, text) {
+  if (msg.raf) { cancelAnimationFrame(msg.raf); msg.raf = null; }
+  updateMessage(msg, text);
+}
+
+/* ================= chat UI ================= */
+
+function scrollToBottom() { main.scrollTop = main.scrollHeight; }
+
+function addUser(text) {
+  const wrap = document.createElement("div");
+  wrap.className = "msg user";
+  const b = document.createElement("div");
+  b.className = "bubble";
+  b.textContent = text;
+  wrap.appendChild(b);
+  chat.appendChild(wrap);
+  scrollToBottom();
+}
+
+function createAssistantMsg() {
+  const wrap = document.createElement("div");
+  wrap.className = "msg assistant";
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+  wrap.appendChild(bubble);
+  chat.appendChild(wrap);
+  const msg = { wrap, bubble, els: [], sealed: new Set(), cache: new Map(), raf: null, pending: "", text: "" };
+  wrap._msg = msg;
+  scrollToBottom();
+  return msg;
+}
+
+function addTyping() {
+  const wrap = document.createElement("div");
+  wrap.className = "msg assistant";
+  wrap.id = "typing-msg";
+  wrap.innerHTML = `<div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>`;
+  chat.appendChild(wrap);
+  scrollToBottom();
+}
+function removeTyping() {
+  const el = document.getElementById("typing-msg");
+  if (el) el.remove();
+}
+
+function addCopyBtn(msg, text) {
+  const row = document.createElement("div");
+  row.className = "copy-row";
+  const btn = document.createElement("button");
+  btn.className = "copy-btn";
+  btn.textContent = "⧉ Copy";
+  btn.onclick = () => {
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = "✓ Copied";
+      setTimeout(() => (btn.textContent = "⧉ Copy"), 1500);
+    });
+  };
+  row.appendChild(btn);
+  msg.bubble.appendChild(row);
+}
+
+function addError(text) {
+  const wrap = document.createElement("div");
+  wrap.className = "msg assistant";
+  wrap.innerHTML = `<div class="bubble error">${escapeHtml(text)}</div>`;
+  chat.appendChild(wrap);
+  scrollToBottom();
+}
+
+async function send() {
+  const text = input.value.trim();
+  if (!text || busy) return;
+  busy = true;
+  sendBtn.disabled = true;
+  input.value = "";
+  input.style.height = "28px";
+  if (welcome) { welcome.remove(); welcome = null; }
+
+  addUser(text);
+  history.push({ role: "user", content: text });
+  addTyping();
+
+  let full = "";
+  let msg = null;
+  try {
+    const res = await fetch("/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text, history: history.slice(0, -1) })
+    });
+    if (!res.ok || !res.body) throw new Error("bad response");
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const parts = buf.split("\n\n");
+      buf = parts.pop();
+      for (const part of parts) {
+        if (!part.startsWith("data: ")) continue;
+        let obj;
+        try { obj = JSON.parse(part.slice(6)); } catch { continue; }
+        if (obj.error) {
+          removeTyping();
+          if (msg) msg.wrap.remove();
+          addError(obj.error);
+          history.pop();
+          return;
+        }
+        if (obj.token) {
+          if (!msg) { removeTyping(); msg = createAssistantMsg(); }
+          full += obj.token;
+          scheduleUpdate(msg, full);
+        }
+      }
+    }
+    removeTyping();
+    if (msg && full) {
+      flushUpdate(msg, full);
+      addCopyBtn(msg, full);
+      history.push({ role: "assistant", content: full });
+    } else if (!msg) {
+      addError("No response received from the server.");
+    }
+  } catch (e) {
+    removeTyping();
+    if (msg) msg.wrap.remove();
+    addError("Network error — could not reach the server.");
+    history.pop();
+  } finally {
+    busy = false;
+    sendBtn.disabled = false;
+    input.focus();
+  }
+}
+
+sendBtn.addEventListener("click", send);
+input.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+});
+input.addEventListener("input", () => {
+  input.style.height = "auto";
+  input.style.height = Math.min(input.scrollHeight, 180) + "px";
+});
+document.querySelectorAll(".chip").forEach(c => c.addEventListener("click", () => {
+  input.value = c.textContent;
+  send();
+}));
+input.focus();
+</script>
+</body>
+</html>
